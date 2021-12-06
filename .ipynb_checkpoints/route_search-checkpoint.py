@@ -163,19 +163,16 @@ import pandas as pd
     
 def astar(start = 2270143902, end = 1079387396):
     edges = pd.read_csv('./edges.csv')
-    
     nodes = pd.DataFrame(edges)['start'].tolist()
     nodes.extend(pd.DataFrame(edges)['end'].tolist())
+    edges = edges.set_index('start')
     nodes = list(dict.fromkeys(nodes)) # remove duplicate
     nodes = pd.DataFrame(nodes,columns=['node'])
+    nodes = nodes.set_index('node')
     heuristics = pd.read_csv('./heuristic.csv')
     heuristics = pd.DataFrame(heuristics,columns=['node', str(end)])
     heuristics = heuristics.set_index('node')
-    edges = edges.set_index('start')
-    print("heuristics table")
-    print(heuristics)
-    print("edges table")
-    print(edges)
+    
     visited = {}
     previous = {}
     distance = []
@@ -183,13 +180,13 @@ def astar(start = 2270143902, end = 1079387396):
     zero = np.zeros((row,1),dtype=int)
     nodes['visited'] = zero
     nodes['previous'] = zero
-    print("nodes table")
-    print(nodes)
-    nodes = nodes.set_index('node')
     
-    #print(heuristics[heuristics['node']==start].iat[0,1])
+    print(" ===== edges table =====\n",edges)
+    print(" ===== nodes table =====\n",nodes)
+    print(" ===== heuristics table =====\n",heuristics)
+    
+    
     distance.append([start, 0, heuristics.at[start,str(end)], 0])
-    
     nodes.loc[str(start), 'visited'] = 1
     nodes.loc[str(start), 'previous'] = 1
     num_visited = 0
@@ -200,44 +197,26 @@ def astar(start = 2270143902, end = 1079387396):
         d = distance[0][1]
         #print(nodes.loc[str(s),'visited'])
         if nodes.at[int(s),'visited'] == 0:
-        #if visited[s] == 0:
             nodes.at[int(s),'visited'] = 1
-            #visited[s] = 1
             nodes.at[int(s),'previous'] = distance[0][3] 
-            #previous[s] = distance[0][3]
         distance.pop(0)
-        #edge = edges[edges['start'] == s]
         edge = edges.loc[s,:]
         if not isinstance(edge, pd.DataFrame):
-            
             edge = edge.to_frame().transpose()
-            
         for index,edg in edge.iterrows():
             if(nodes.at[edg['end'],'visited'] == 0):
-        #for edge in edgess:
-        #    if edge['start'] == s:
-        
-        #if nodes.at[edge_end,'visited'] == 0:
-        #if visited[edge['end']] == 0:
-            #print("fjeiwjfw")
                 e = edg['end']
-                print(edg['end'], d , edg['distance'] , s)
                 distance.append([e, d + edg['distance'], heuristics.at[int(e),str(end)] , s])
                 dist = d + edge['distance']
                 if e == end:
-                    print("end = ",end)
-                    print("s = ",s)
                     nodes.at[end,'previous'] = s
-                    #previous[end] = s
                     distance.clear()
                     break
     num_visited = sum(list(visited.values()))-1
     path = []
     path.append(end)
     current_node = end
-    print("current_node",current_node)
     while nodes.at[current_node,'previous'] != 0:
-    #while previous[current_node] != 0:
         path.append(nodes.at[current_node,'previous'])
         current_node = nodes.at[current_node,'previous']
     path.reverse()
@@ -245,68 +224,7 @@ def astar(start = 2270143902, end = 1079387396):
     
     
     
-    '''with open('edges.csv', newline='') as csvfile:
-        edges = csv.DictReader(csvfile)
-        nodes = []
-        edgess = []
-        for edge in edges:
-            edge['start'] = int(edge['start'])
-            edge['end'] = int(edge['end'])
-            edge['distance'] = float(edge['distance'])
-            edge['speed limit'] = float(edge['speed limit'])
-            nodes.append(edge['start'])
-            nodes.append(edge['end'])
-            edgess.append(edge)
-            
-        with open('heuristic.csv', newline='') as csvfile2:
-            heuristics = csv.DictReader(csvfile2)
-            heuristicss = {}
-            for heuristic in heuristics:
-                #print(heuristic)
-                heuristicss[int(heuristic['node'])] = float(heuristic[str(end)])
-            #print(heuristicss)
-            #print(nodes)
-            nodes = list(dict.fromkeys(nodes))
-            #print(nodes)
-            nodes.sort()
-            
-            visited = {}
-            previous = {}
-            distance = []
-            for node in nodes:
-                visited[node] = 0
-                previous[node] = 0
-            distance.append([start, 0, heuristicss[start], 0])
-            visited[start] = 1
-            num_visited = 0
-            dist = 0.0
-            while distance:
-                distance.sort(key=lambda x: x[1]+x[2])
-                s = distance[0][0]
-                d = distance[0][1]
-                if visited[s] == 0:
-                    visited[s] = 1
-                    previous[s] = distance[0][3]
-                distance.pop(0)
-                for edge in edgess:
-                    if edge['start'] == s:
-                        if visited[edge['end']] == 0:
-                            e = edge['end']
-                            distance.append([edge['end'], d+edge['distance'], heuristicss[edge['end']], edge['start']])
-                            dist = d+edge['distance']
-                            if e == end:
-                                previous[end] = edge['start']
-                                distance.clear()
-                                break
-            num_visited = sum(list(visited.values()))-1
-            path = []
-            path.append(end)
-            current_node = end
-            while previous[current_node] != 0:
-                path.append(previous[current_node])
-                current_node = previous[current_node]
-            path.reverse()
-            return path, dist, num_visited'''
+
             
 def astar_time(start = 2270143902, end = 1079387396):
     with open('edges.csv', newline='') as csvfile:

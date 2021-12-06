@@ -162,24 +162,21 @@ import numpy as np
 import pandas as pd
     
 def astar(start = 2270143902, end = 1079387396):
-    edges = pd.read_csv('./edges.csv')
+    edges = pd.read_csv('./edges.csv').astype(float)
     nodes = pd.DataFrame(edges)['start'].tolist()
     nodes.extend(pd.DataFrame(edges)['end'].tolist())
-    edges = edges.set_index('start')
     nodes = list(dict.fromkeys(nodes)) # remove duplicate
-    nodes = pd.DataFrame(nodes,columns=['node'])
+    edges = edges.set_index('start')
+    nodes = pd.DataFrame(nodes,columns=['node']).astype(float)
     nodes = nodes.set_index('node')
-    heuristics = pd.read_csv('./heuristic.csv')
-    heuristics = pd.DataFrame(heuristics,columns=['node', str(end)])
-    heuristics = heuristics.set_index('node')
+    heuristics = pd.DataFrame(pd.read_csv('./heuristic.csv'),columns=['node', str(end)]).set_index('node').astype(float)
     
     visited = {}
     previous = {}
     distance = []
-    row, col = nodes.shape
-    zero = np.zeros((row,1),dtype=int)
-    nodes['visited'] = zero
-    nodes['previous'] = zero
+
+    nodes['visited'] = 0
+    nodes['previous'] = 0
     
     print(" ===== edges table =====\n",edges)
     print(" ===== nodes table =====\n",nodes)
@@ -195,7 +192,6 @@ def astar(start = 2270143902, end = 1079387396):
         distance.sort(key=lambda x: x[1]+x[2])
         s = distance[0][0]
         d = distance[0][1]
-        #print(nodes.loc[str(s),'visited'])
         if nodes.at[int(s),'visited'] == 0:
             nodes.at[int(s),'visited'] = 1
             nodes.at[int(s),'previous'] = distance[0][3] 

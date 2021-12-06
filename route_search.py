@@ -196,7 +196,10 @@ def astar(start = 2270143902, end = 1079387396):
             nodes.at[int(s),'visited'] = 1
             nodes.at[int(s),'previous'] = distance[0][3] 
         distance.pop(0)
-        edge = edges.loc[s,:]
+        try:
+            edge = edges.loc[s,:]
+        except:
+            continue
         if not isinstance(edge, pd.DataFrame):
             edge = edge.to_frame().transpose()
         for index,edg in edge.iterrows():

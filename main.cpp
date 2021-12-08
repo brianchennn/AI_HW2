@@ -16,7 +16,7 @@
 #include <sstream>
 
 #include <pthread.h>
-
+#include <mutex>
 using namespace std;
 
 typedef struct node{
@@ -40,14 +40,15 @@ typedef struct{
 	double speed_limit;
 }edge;
 
-vector<node *> OPEN;
-vector<node *> CLOSED;
-vector<node> nodes;
-vector<edge> edges;
-string start;
-string end;
-node *best_n;
-double incumbent_cost;
+static vector<node *> OPEN;
+static vector<node *> CLOSED;
+static vector<node> nodes;
+static vector<edge> edges;
+static string start;
+static string endd;
+mutex lo,li;
+
+double incumbent_cost = DBL_MAX;
 bool compare(node *a, node *b){
 	return a->g + a->h > b->g + b->h;
 }
@@ -60,22 +61,26 @@ double find_dist(vector<edge> edges, node *a, node *b){
 	return DBL_MAX;
 }
 
-void job(void *args){
+void *job(void *args){
 	while(1){
+        //printf("fwf\n");
 		if(OPEN.size() == 0)
 			continue;
+        //lo.lock();
 		sort(OPEN.begin(), OPEN.end(), compare);
 		node *n = OPEN[OPEN.size() - 1];
-		n->visited = 1;
+		//n->visited = 1;
 		if(n->g + n->h >= incumbent_cost)
 			break;
 		OPEN.pop_back();
+        //lo.unlock();
 		CLOSED.push_back(n);
-		if(n->ID == end){
+		if(n->ID == endd){
+            //li.lock();
 			if(n->g < incumbent_cost){
 				incumbent_cost = n->g;
-				best_n = n;
 			}
+            //li.lock();
 		}
 		int i = 0;
 		for( ; i < edges.size(); i++){
@@ -130,7 +135,7 @@ int main(int argc, char *argv[]){
 	printf("\nReading csv file and generate nodes table...\n");
 	
 	start = argv[1];
-	end = argv[2];
+	endd = argv[2];
 	char str[128];
 	FILE *fp = fopen("edges.csv","r");
 	//vector<edge> edges;
@@ -175,11 +180,11 @@ int main(int argc, char *argv[]){
 		node n;
 		n.ID = heuristics[i].start;
 		n.g = 0;
-		if(end == "1079387396")
+		if(endd == "1079387396")
 			n.h = heuristics[i].end1;
-		else if(end == "1737223506")
+		else if(endd == "1737223506")
 			n.h = heuristics[i].end2;
-		else if(end == "8513026827")
+		else if(endd == "8513026827")
 			n.h = heuristics[i].end3;
 		n.visited = 0;
 		n.previous = NULL;
@@ -206,70 +211,15 @@ int main(int argc, char *argv[]){
 	node *n;
 	node *best_n;
 	// OPEN, CLOSED, nodes, edges, 
-	int pthread_num = 4;
+	int pthread_num = 1;
 	pthread_t t[pthread_num];
 	for (int i = 0 ; i < pthread_num ; i++){
 		pthread_create(&t[i], NULL, &job, NULL);
 	}
 	for (int i = 0 ; i < pthread_num ; i++){
-		pthread_join(&t[i], NULL);
+		pthread_join(t[i], NULL);
 	}
-	/*
-	while(1){
-		if(OPEN.size() == 0)
-			continue;
-		sort(OPEN.begin(), OPEN.end(), compare);
-		n = OPEN[OPEN.size() - 1];
-		n->visited = 1;
-		if(n->g + n->h >= incumbent_cost)
-			break;
-		OPEN.pop_back();
-		CLOSED.push_back(n);
-		if(n->ID == end){
-			if(n->g < incumbent_cost){
-				incumbent_cost = n->g;
-				best_n = n;
-			}
-		}
-		int i = 0;
-		for( ; i < edges.size(); i++){
-			if(edges[i].start == n->ID){
-				break;
-			}
-		}
-		for(; i < edges.size() && edges[i].start == n->ID; i++){
-			for(int j = 0; j < nodes.size(); j++){
-				if(nodes[j].ID == edges[i].end){
-					int flag = 0;
-					node *neighbor = &nodes[j];
-					double g1 = n->g + edges[i].distance;
-					vector<node *>::iterator it1 = find(CLOSED.begin(),CLOSED.end(),neighbor);
-					vector<node *>::iterator it2 = find(OPEN.begin(),OPEN.end(),neighbor);
-					if(it1 != CLOSED.end()){
-						if(g1 < neighbor->g){
-							OPEN.push_back(neighbor);
-							CLOSED.erase(it1);
-						}else{
-							flag = 1;
-						}
-					}else{	
-						if(it2 == OPEN.end()){
-							OPEN.push_back(neighbor);
-						}else if(g1 >= neighbor->g){
-							flag = 1;
-						}
-					}
-					if(flag == 0){
-						neighbor->g = g1;
-						neighbor->previous = n;
-					}
-					break;
-				}
-			}
-		}
-	}*/
-
-	auto t4 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+		auto t4 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	printf(" %.3lfs used.\n\n",(double)(t4 - t3)/1000);
 	
 	printf("Calculate statistic data...\n");
@@ -279,7 +229,11 @@ int main(int argc, char *argv[]){
 	if(incumbent_cost == DBL_MAX){
 		printf("fail\n");
 	}else{
-		node *cur = best_n;
+        node *cur;
+        for(int i = 0 ; i < nodes.size(); i++){
+            if(nodes[i].ID == endd)
+                cur = &nodes[i];
+        }
 		for (;cur->previous != NULL;){
 			path.push_back(cur->ID);
 			dist += find_dist(edges, cur->previous, cur);

@@ -46,7 +46,7 @@ static vector<node> nodes;
 static vector<edge> edges;
 static string start;
 static string endd;
-mutex lo,li;
+pthread_mutex_t lo,li;
 
 double incumbent_cost = DBL_MAX;
 bool compare(node *a, node *b){
@@ -63,24 +63,23 @@ double find_dist(vector<edge> edges, node *a, node *b){
 
 void *job(void *args){
 	while(1){
-        //printf("fwf\n");
+        //printf("%lu\n",OPEN.size());
 		if(OPEN.size() == 0)
 			continue;
-        //lo.lock();
+        pthread_mutex_lock(&lo);
 		sort(OPEN.begin(), OPEN.end(), compare);
 		node *n = OPEN[OPEN.size() - 1];
-		//n->visited = 1;
 		if(n->g + n->h >= incumbent_cost)
 			break;
 		OPEN.pop_back();
-        //lo.unlock();
 		CLOSED.push_back(n);
+        pthread_mutex_unlock(&lo);
 		if(n->ID == endd){
-            //li.lock();
+            pthread_mutex_lock(&lo);
 			if(n->g < incumbent_cost){
 				incumbent_cost = n->g;
 			}
-            //li.lock();
+            pthread_mutex_unlock(&lo);
 		}
 		int i = 0;
 		for( ; i < edges.size(); i++){
@@ -98,14 +97,18 @@ void *job(void *args){
 					vector<node *>::iterator it2 = find(OPEN.begin(),OPEN.end(),neighbor);
 					if(it1 != CLOSED.end()){
 						if(g1 < neighbor->g){
+                            pthread_mutex_lock(&lo);
 							OPEN.push_back(neighbor);
 							CLOSED.erase(it1);
+                            pthread_mutex_unlock(&lo);
 						}else{
 							flag = 1;
 						}
 					}else{	
 						if(it2 == OPEN.end()){
+                            pthread_mutex_lock(&lo);
 							OPEN.push_back(neighbor);
+                            pthread_mutex_unlock(&lo);
 						}else if(g1 >= neighbor->g){
 							flag = 1;
 						}
@@ -209,7 +212,8 @@ int main(int argc, char *argv[]){
 	}
 	OPEN.push_back(root);
 	node *n;
-	node *best_n;
+    pthread_mutex_init(&lo, NULL);
+    pthread_mutex_init(&li, NULL);
 	// OPEN, CLOSED, nodes, edges, 
 	int pthread_num = 1;
 	pthread_t t[pthread_num];
@@ -219,6 +223,8 @@ int main(int argc, char *argv[]){
 	for (int i = 0 ; i < pthread_num ; i++){
 		pthread_join(t[i], NULL);
 	}
+    pthread_mutex_destroy(&lo);
+    pthread_mutex_destroy(&li);
 		auto t4 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	printf(" %.3lfs used.\n\n",(double)(t4 - t3)/1000);
 	

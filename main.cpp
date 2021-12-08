@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <string>
-
+#include <algorithm>
 #include <vector>
 #include <cstdlib>
 #include <float.h>
@@ -44,7 +44,8 @@ vector<node *> OPEN;
 vector<node *> CLOSED;
 vector<node> nodes;
 vector<edge> edges;
-string start, end;
+string start;
+string end;
 node *best_n;
 double incumbent_cost;
 bool compare(node *a, node *b){

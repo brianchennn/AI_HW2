@@ -37,32 +37,21 @@ bool compare(node *a, node *b){
 	return a->g + a->h > b->g + b->h;
 }
 
-
-int main(){
-	int Case;
-	printf("Input case: \n");
-	scanf("%d", &Case);
-	string start, end;
-	switch(Case){
-		case 1:
-			start = "2270143902";
-			end = "1079387396";
-			break;
-		case 2:
-			start = "426882161";
-			end = "1737223506";
-			break;
-		case 3:
-			start = "1718165260";
-			end = "8513026827";
-			break;
-		default:
-			start = "0";
-			end = "0";
-			printf("wrong case\n");
-			break;
+double find_dist(vector<edge> edges, node *a, node *b){
+	for(int i=0;i<edges.size();i++){
+		if(edges[i].start == a->ID && edges[i].end == b->ID)
+			return edges[i].distance;
 	}
-	
+	return DBL_MAX;
+}
+
+
+int main(int argc, char *argv[]){
+	if(argc != 3)
+		perror("Usage : ./main [start] [end]");
+	string start, end;
+	start = argv[1];
+	end = argv[2];
 	char str[128];
 	FILE *fp = fopen("edges.csv","r");
 	vector<edge> edges;
@@ -106,19 +95,12 @@ int main(){
 		node n;
 		n.ID = heuristics[i].start;
 		n.g = 0;
-		switch(Case){
-			case 1:
-				n.h = heuristics[i].end1;
-				break;
-			case 2:
-				n.h = heuristics[i].end2;
-				break;
-			case 3:
-				n.h = heuristics[i].end3;
-				break;
-			default:
-				break;
-		}
+		if(end == "1079387396")
+			n.h = heuristics[i].end1;
+		else if(end == "1737223506")
+			n.h = heuristics[i].end2;
+		else if(end == "8513026827")
+			n.h = heuristics[i].end3;
 		n.visited = 0;
 		n.previous = NULL;
 		nodes.push_back(n);
@@ -135,19 +117,22 @@ int main(){
 	}
 	OPEN.push_back(root);
 	node *n;
+	node *best_n;
 	while(1){
 		if(OPEN.size() == 0)
-			return 0;
-			//continue;
+			continue;
 		sort(OPEN.begin(), OPEN.end(), compare);
 		n = OPEN[OPEN.size() - 1];
+		n->visited = 1;
+		if(n->g + n->h >= incumbent_cost)
+			break;
 		OPEN.pop_back();
 		CLOSED.push_back(n);
 		if(n->ID == end){
 			if(n->g < incumbent_cost){
 				incumbent_cost = n->g;
+				best_n = n;
 			}
-			break;
 		}
 		int i = 0;
 		for( ; i < edges.size(); i++){
@@ -160,7 +145,7 @@ int main(){
 				if(nodes[j].ID == edges[i].end){
 					int flag = 0;
 					node *neighbor = &nodes[j];
-					double g1 = neighbor->g + edges[i].distance;
+					double g1 = n->g + edges[i].distance;
 					vector<node *>::iterator it1 = find(CLOSED.begin(),CLOSED.end(),neighbor);
 					vector<node *>::iterator it2 = find(OPEN.begin(),OPEN.end(),neighbor);
 					if(it1 != CLOSED.end()){
@@ -187,14 +172,21 @@ int main(){
 		}
 	}
 	vector<string> path;
+	double dist = 0.f;
 	if(incumbent_cost == DBL_MAX){
 		printf("fail\n");
 	}else{
-		node *cur = n;
+		node *cur = best_n;
 		for (;cur->previous != NULL;){
 			path.push_back(cur->ID);
-			//cout << cur->ID << endl;
+			dist += find_dist(edges, cur->previous, cur);
 			cur = cur->previous;
+
+		}
+		int visited_nodes = 0;
+		for(int i=0;i<nodes.size();i++){
+			if(nodes[i].visited == 1)
+				visited_nodes ++;
 		}
 		reverse(path.begin(), path.end());
 		fp = fopen("path.txt","w");
@@ -202,7 +194,9 @@ int main(){
 			fprintf(fp,"%s\n",path[i].c_str());
 		}
 		fclose(fp);
-		printf("success\n");
+		printf("A* Success\n");
+		printf("Visited_nodes: %d\n",visited_nodes);
+		printf("Total distance: %lf\n",dist);
 	}
 	
 }

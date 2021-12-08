@@ -15,6 +15,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include <pthread.h>
+
 using namespace std;
 
 typedef struct node{
@@ -38,6 +40,13 @@ typedef struct{
 	double speed_limit;
 }edge;
 
+vector<node *> OPEN;
+vector<node *> CLOSED;
+vector<node> nodes;
+vector<edge> edges;
+string start, end;
+node *best_n;
+double incumbent_cost;
 bool compare(node *a, node *b){
 	return a->g + a->h > b->g + b->h;
 }
@@ -50,24 +59,80 @@ double find_dist(vector<edge> edges, node *a, node *b){
 	return DBL_MAX;
 }
 
+void job(void *args){
+	while(1){
+		if(OPEN.size() == 0)
+			continue;
+		sort(OPEN.begin(), OPEN.end(), compare);
+		node *n = OPEN[OPEN.size() - 1];
+		n->visited = 1;
+		if(n->g + n->h >= incumbent_cost)
+			break;
+		OPEN.pop_back();
+		CLOSED.push_back(n);
+		if(n->ID == end){
+			if(n->g < incumbent_cost){
+				incumbent_cost = n->g;
+				best_n = n;
+			}
+		}
+		int i = 0;
+		for( ; i < edges.size(); i++){
+			if(edges[i].start == n->ID){
+				break;
+			}
+		}
+		for(; i < edges.size() && edges[i].start == n->ID; i++){
+			for(int j = 0; j < nodes.size(); j++){
+				if(nodes[j].ID == edges[i].end){
+					int flag = 0;
+					node *neighbor = &nodes[j];
+					double g1 = n->g + edges[i].distance;
+					vector<node *>::iterator it1 = find(CLOSED.begin(),CLOSED.end(),neighbor);
+					vector<node *>::iterator it2 = find(OPEN.begin(),OPEN.end(),neighbor);
+					if(it1 != CLOSED.end()){
+						if(g1 < neighbor->g){
+							OPEN.push_back(neighbor);
+							CLOSED.erase(it1);
+						}else{
+							flag = 1;
+						}
+					}else{	
+						if(it2 == OPEN.end()){
+							OPEN.push_back(neighbor);
+						}else if(g1 >= neighbor->g){
+							flag = 1;
+						}
+					}
+					if(flag == 0){
+						neighbor->g = g1;
+						neighbor->previous = n;
+					}
+					break;
+				}
+			}
+		}
+	}
+}
 using std::cout; using std::endl;
 using std::chrono::duration_cast;
 using std::chrono::milliseconds;
 using std::chrono::seconds;
 using std::chrono::system_clock;
 
+
 int main(int argc, char *argv[]){
 
 	auto t1 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	if(argc != 3)
 		perror("Usage : ./main [start] [end]");
-	printf("Reading csv file and generate nodes table...\n");
-	string start, end;
+	printf("\nReading csv file and generate nodes table...\n");
+	
 	start = argv[1];
 	end = argv[2];
 	char str[128];
 	FILE *fp = fopen("edges.csv","r");
-	vector<edge> edges;
+	//vector<edge> edges;
 	edge e;
 	fgets(str,256,fp);
 
@@ -104,7 +169,7 @@ int main(int argc, char *argv[]){
 		heuristics.push_back(heu);
 	}
 	fclose(fp);
-	vector<node> nodes;
+	//vector<node> nodes;
 	for(int i = 0 ; i < heuristics.size(); i++){
 		node n;
 		n.ID = heuristics[i].start;
@@ -126,9 +191,9 @@ int main(int argc, char *argv[]){
 	printf("Starting A* algorithm...\n");
 	auto t3 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 
-	vector<node *> OPEN;
-	vector<node *> CLOSED;
-	double incumbent_cost = DBL_MAX;
+	//vector<node *> OPEN;
+	//vector<node *> CLOSED;
+	//double incumbent_cost = DBL_MAX;
 	node *root;
 	for (int i = 0 ; i < nodes.size(); i++){
 		if(nodes[i].ID == start){
@@ -139,6 +204,16 @@ int main(int argc, char *argv[]){
 	OPEN.push_back(root);
 	node *n;
 	node *best_n;
+	// OPEN, CLOSED, nodes, edges, 
+	int pthread_num = 4;
+	pthread_t t[pthread_num];
+	for (int i = 0 ; i < pthread_num ; i++){
+		pthread_create(&t[i], NULL, &job, NULL);
+	}
+	for (int i = 0 ; i < pthread_num ; i++){
+		pthread_join(&t[i], NULL);
+	}
+	/*
 	while(1){
 		if(OPEN.size() == 0)
 			continue;
@@ -191,7 +266,7 @@ int main(int argc, char *argv[]){
 				}
 			}
 		}
-	}
+	}*/
 
 	auto t4 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	printf(" %.3lfs used.\n\n",(double)(t4 - t3)/1000);

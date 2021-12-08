@@ -10,6 +10,11 @@
 #include <cstdlib>
 #include <float.h>
 
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
+
 using namespace std;
 
 typedef struct node{
@@ -45,10 +50,18 @@ double find_dist(vector<edge> edges, node *a, node *b){
 	return DBL_MAX;
 }
 
+using std::cout; using std::endl;
+using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+using std::chrono::seconds;
+using std::chrono::system_clock;
 
 int main(int argc, char *argv[]){
+
+	auto t1 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	if(argc != 3)
 		perror("Usage : ./main [start] [end]");
+	printf("Reading csv file and generate nodes table...\n");
 	string start, end;
 	start = argv[1];
 	end = argv[2];
@@ -57,6 +70,7 @@ int main(int argc, char *argv[]){
 	vector<edge> edges;
 	edge e;
 	fgets(str,256,fp);
+
 	while(fgets(str,256,fp)){
 		const char s[2] = ",";
 		char *token = strtok(str, s);
@@ -105,6 +119,13 @@ int main(int argc, char *argv[]){
 		n.previous = NULL;
 		nodes.push_back(n);
 	}
+	auto t2 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+	printf(" %.3lfs used\n\n", (double)(t2 - t1)/1000);
+
+
+	printf("Starting A* algorithm...\n");
+	auto t3 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+
 	vector<node *> OPEN;
 	vector<node *> CLOSED;
 	double incumbent_cost = DBL_MAX;
@@ -171,6 +192,12 @@ int main(int argc, char *argv[]){
 			}
 		}
 	}
+
+	auto t4 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+	printf(" %.3lfs used.\n\n",(double)(t4 - t3)/1000);
+	
+	printf("Calculate statistic data...\n");
+	auto t5 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	vector<string> path;
 	double dist = 0.f;
 	if(incumbent_cost == DBL_MAX){
@@ -194,6 +221,8 @@ int main(int argc, char *argv[]){
 			fprintf(fp,"%s\n",path[i].c_str());
 		}
 		fclose(fp);
+		auto t6 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+		printf(" %.3lf used.\n\n\n",(double)(t6 - t5)/1000);
 		printf("A* Success\n");
 		printf("Visited_nodes: %d\n",visited_nodes);
 		printf("Total distance: %lf\n",dist);

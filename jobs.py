@@ -12,6 +12,7 @@ def job(ns,lock1,lock2):
     ns.distance.sort(key=lambda x: x[1]+x[2])
     if(ns.distance == []):
         return
+    lock1.acquire()
     s = ns.distance[0][0]
     d = ns.distance[0][1]
     if(s == ns.end):
@@ -21,13 +22,9 @@ def job(ns,lock1,lock2):
         return
     best_dist = ns.distance[0]
     ns.distance.pop(0)
+    lock1.release()
     if(best_dist[1] + best_dist[2] > ns.incumbent_cost):
         return
-    #print(best_dist)
-    #if nodes.at[s,'visited'] == 0:
-    #    nodes.at[s,'visited'] = 1
-    #    nodes.at[s,'previous'] = best_dist[3]
-
     try:
         edge = ns.edges.loc[int(s),:]
     except:
@@ -37,9 +34,12 @@ def job(ns,lock1,lock2):
 
     for index,edg in edge.iterrows():
         e = int(edg['end'])
+        lock2.acquire()
         if(ns.nodes.at[e,'visited'] == 0):
-            #print("fewfew")
+            print("fwfewfe")
+            lock1.acquire()
             ns.distance.append([e, d + edg['distance'], ns.heuristics.at[e,str(ns.end)] , s])
+            lock1.release()
             ns.nodes.at[e,'visited'] = 1
             ns.nodes.at[e,'g'] = d + edg['distance']
             ns.nodes.at[e,'previous'] = s
@@ -47,14 +47,17 @@ def job(ns,lock1,lock2):
             #if e == end:
             #    nodes.at[end,'previous'] = s
             #    break
-        '''else:
+        else:
             if(nodes.at[e,'g'] > d + edg['distance']):
+                lock1.acquire()
                 distance.append([e, d + edg['distance'], heuristics.at[e,str(end)] , s])
+                lock1.release()
                 nodes.at[e,'g'] = d + edg['distance']
                 dist = d + edg['distance']
                 nodes.at[e,'previous'] = s
             else:
-                pass '''
+                pass
+        lock2.release()
         #lock2.release()
 
 

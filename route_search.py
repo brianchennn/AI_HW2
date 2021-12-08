@@ -1,6 +1,7 @@
 import csv
 import time
-
+import threading
+from multiprocessing import Process
 def bfs(start = 2270143902, end = 1079387396):
     with open('edges.csv', newline='') as csvfile:
         edges = csv.DictReader(csvfile)
@@ -161,9 +162,76 @@ def ucs(start = 2270143902, end = 1079387396):
 
 import numpy as np
 import pandas as pd
-    
+
+
+global dist,accu_time,for_loop_time,sort_time,mid_time,nodes_query_time,edges_query_time,dist,done
+global edges, nodes, heuristics, visited, previous,lock1,lock2
+
+
+
+
+
 def astar(start = 2270143902, end = 1079387396):
-    
+    def job():
+        global dist,accu_time,for_loop_time,sort_time,mid_time,nodes_query_time,edges_query_time,dist,done
+        global edges, nodes, heuristics, visited, previous,lock1,lock2
+        #print("done = ",done)
+        #print(len(distance))
+        t17 = time.time()
+        lock1.acquire()
+        distance.sort(key=lambda x: x[1]+x[2])
+        t18 = time.time()
+        sort_time += t18 - t17
+        if(distance == []):
+            print(" empty")
+            return
+        #print(distance)
+        s = distance[0][0]
+        if(s == end):
+            done = 1
+        d = distance[0][1]
+        best_dist = distance.pop(0)
+        lock1.release()
+        t50 = time.time()
+        lock2.acquire()
+        if nodes.at[s,'visited'] == 0:
+            nodes.at[s,'visited'] = 1
+            nodes.at[s,'previous'] = best_dist[3]
+        lock2.release()
+        t51 = time.time()
+        nodes_query_time += t51 - t50
+        t53 = time.time()
+        try:
+            edge = edges.loc[int(s),:]
+        except:
+            return
+        if not isinstance(edge, pd.DataFrame): 
+            edge = edge.to_frame().transpose() # 轉成 DataFrame
+        t54 = time.time()
+        edges_query_time += t54 - t53
+        t19 = time.time()
+        mid_time += t19 - t18
+        t4 = time.time()
+        for index,edg in edge.iterrows():
+            e = int(edg['end'])
+            if(nodes.at[e,'visited'] == 0):
+                lock1.acquire()
+                distance.append([e, d + edg['distance'], heuristics.at[e,str(end)] , s])
+                lock1.release()
+                dist = d + edg['distance']
+                if e == end:
+                    lock2.acquire()
+                    nodes.at[end,'previous'] = s
+                    lock2.release()
+                    #print("clear")
+                    #done = 1
+                    #distance.clear()
+
+                    break
+        t5 = time.time()
+        for_loop_time += t5 - t4
+    global dist,accu_time,for_loop_time,sort_time,mid_time,nodes_query_time,edges_query_time,dist,done
+    global edges, nodes, heuristics, visited, previous,lock1,lock2
     edges = pd.read_csv('./edges.csv')
     edges.sort_values(by=['start'])
     edges_start_list = edges['start'].tolist()
@@ -192,7 +260,7 @@ def astar(start = 2270143902, end = 1079387396):
     nodes.loc[str(start), 'visited'] = 1
     nodes.loc[str(start), 'previous'] = 1
     num_visited = 0
-    dist = 0.0
+    global dist,accu_time,for_loop_time,sort_time,mid_time,nodes_query_time,edges_query_time,dist,done
     nodes_row,nodes_col = nodes.shape
     nodes_index = nodes.index
     print("number of nodes: ",nodes_row)
@@ -203,43 +271,20 @@ def astar(start = 2270143902, end = 1079387396):
     nodes_query_time = 0.0
     edges_query_time = 0.0
     t12 = time.time()
-    while distance:
-        
-        t17 = time.time()
-        distance.sort(key=lambda x: x[1]+x[2])
-        t18 = time.time()
-        sort_time += t18 - t17
-        s = distance[0][0]
-        d = distance[0][1]
-        t50 = time.time()
-        if nodes.at[s,'visited'] == 0:
-            nodes.at[s,'visited'] = 1
-            nodes.at[s,'previous'] = distance[0][3]
-        distance.pop(0)
-        t51 = time.time()
-        nodes_query_time += t51 - t50
-        t53 = time.time()
-        try:
-            edge = edges.loc[int(s),:]
-        except:
+    t_pool = []
+    lock1 = threading.Lock()
+    lock2 = threading.Lock()
+    done = 0
+    
+    
+    while not done:
+        if(len(distance) == 0):
             continue
-        if not isinstance(edge, pd.DataFrame): 
-            edge = edge.to_frame().transpose() # 轉成 DataFrame
-        t54 = time.time()
-        edges_query_time += t54 - t53
-        t19 = time.time()
-        mid_time += t19 - t18
-        t4 = time.time()
-        for index,edg in edge.iterrows():
-            e = int(edg['end'])
-            if(nodes.at[e,'visited'] == 0):
-                distance.append([e, d + edg['distance'], heuristics.at[e,str(end)] , s])
-                if e == end:
-                    nodes.at[end,'previous'] = s
-                    distance.clear()
-                    break
-        t5 = time.time()
-        for_loop_time += t5 - t4
+        t_pool.append(threading.Thread(target = job))
+        t_pool[-1].start()
+        #job()
+    for i, t in enumerate(t_pool):
+        t_pool[i].join()
     t13 = time.time()
     print("===== Performance =====")
     print("while loop time: ",t13 - t12)

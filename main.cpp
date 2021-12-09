@@ -49,7 +49,7 @@ static vector<edge> edges;
 static string start;
 static string endd;
 
-# define pthread_num  3
+# define pthread_num  1
 # define PAD 64
 pthread_t t[pthread_num];
 bool mask[pthread_num][PAD] = {1};
@@ -73,23 +73,21 @@ double find_dist(vector<edge> edges, node *a, node *b){
 void *job(void *Rank){
     int rank = *(int *)Rank;
 	while(1){
-        //printf("%d\n",OPEN.size());
-        //if(rank != 0)
-        //    printf("Rank %d\n",rank);
         int cont_flag = 0;
         if(mask[rank][0] == 0){
             printf("rank %d finished\n",rank);
             return NULL;
         }
+        pthread_mutex_lock(&lo);
 		if(OPEN.size() == 0){
             int accu = 0;
             for (int i = 0 ; i < pthread_num ; i++){
                 if(mask[i][0] == 0) accu++;
             }
+			pthread_mutex_unlock(&lo);
             if(accu == 1) return NULL;
             else continue;
         }
-        pthread_mutex_lock(&lo);
 		sort(OPEN.begin(), OPEN.end(), compare);
 		node *n = OPEN[0];
         for (int i = 0 ; i < OPEN.size() - 1 ; i++)
@@ -103,9 +101,9 @@ void *job(void *Rank){
         }
         if(n->ID == endd){
 			if(n->g < incumbent_cost){
-                //pthread_mutex_lock(&li);
+                pthread_mutex_lock(&li);
 				incumbent_cost = n->g;
-                //pthread_mutex_unlock(&li);
+                pthread_mutex_unlock(&li);
             }
             printf("mask to 0\n");
             mask[rank][0] = 0;
@@ -261,7 +259,6 @@ int main(int argc, char *argv[]){
 	for (int i = 0 ; i < pthread_num ; i++){
         rank[i] = i;
 		pthread_create(&t[i], NULL, &job, &rank[i]);
-        sleep(1);
 	}
     root_tid = t[0];
 	for (int i = 0 ; i < pthread_num ; i++){
@@ -310,6 +307,7 @@ int main(int argc, char *argv[]){
 		printf("A* Success\n");
 		printf("Visited_nodes: %d\n",visited_nodes);
 		printf("Total distance: %lf\n",dist);
+		printf("Execution time: %lf\n",(double)(t6-t1)/1000);
 	}
 	
 }

@@ -18,6 +18,7 @@
 
 #include <pthread.h>
 #include <mutex>
+#include <thread>
 using namespace std;
 
 typedef struct node{
@@ -51,7 +52,7 @@ static vector<edge> edges;
 static string start;
 static string endd;
 
-# define pthread_num 4
+const int pthread_num = 2;
 # define PAD 64
 pthread_t t[pthread_num];
 bool mask[pthread_num][PAD] = {1};
@@ -75,7 +76,9 @@ double find_dist(vector<edge> edges, node *a, node *b){
 
 void *job(void *Rank){
     int rank = *(int *)Rank;
+    //std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	while(1){
+        //printf("rank %d\n",rank);
         //printf("%d\n",OPEN.size());
         //if(rank != 0)
         //    printf("Rank %d\n",rank);
@@ -84,15 +87,20 @@ void *job(void *Rank){
             printf("rank %d finished\n",rank);
             return NULL;
         }
+        node *n;
+        //pthread_mutex_lock(&lo);
+        double min = DBL_MAX;
         int is_empty = 1;
-        for (int i = 0 ; i < nodes.size() ; i++){
-            if(nodes[i].open == 1){
+        for (int i = 0 ; i < nodes.size(); i++){
+            if(nodes[i].g + nodes[i].h < min && nodes[i].open == 1){
                 is_empty = 0;
-                break;
+                min = nodes[i].g + nodes[i].h;
+                n = &nodes[i];
             }
         }
-		//if(OPEN.size() == 0){
+        //pthread_mutex_unlock(&lo);
         if(is_empty){
+            printf("empty\n");
             int accu = 0;
             for (int i = 0 ; i < pthread_num ; i++){
                 if(mask[i][0] == 0) accu++;
@@ -100,22 +108,8 @@ void *job(void *Rank){
             if(accu == 1) return NULL;
             else continue;
         }
-        node *n;
-        pthread_mutex_lock(&lo);
-        double min = DBL_MAX;
-        for (int i = 0 ; i < nodes.size(); i++){
-            if(nodes[i].g + nodes[i].h < min && nodes[i].open == 1){
-                min = nodes[i].g + nodes[i].h;
-                n = &nodes[i];
-            }
-        }
-		//sort(OPEN.begin(), OPEN.end(), compare);
-		//node *n = OPEN[0];
-        //for (int i = 0 ; i < OPEN.size() - 1 ; i++)
-            //OPEN[i] = OPEN[i+1];
-		//OPEN.pop_back();
-        //pthread_mutex_unlock(&lo);
-        n->visited = 1;
+
+		//pthread_mutex_lock(&n->mut);
 		if(n->g + n->h >= incumbent_cost){
             mask[rank][0] = 0;
             cont_flag = 1;
@@ -130,11 +124,12 @@ void *job(void *Rank){
             mask[rank][0] = 0;
             cont_flag = 1;
 		}
-        //pthread_mutex_lock(&lo);
 		//CLOSED.push_back(n);
         n->open = 0;
         n->closed = 1;
-        pthread_mutex_unlock(&lo);
+        n->visited = 1;
+        //pthread_mutex_unlock(&n->mut);
+
 	    if(cont_flag == 1) continue;	
 		int i = 0;
 		for( ; i < edges.size(); i++){
@@ -147,7 +142,7 @@ void *job(void *Rank){
 				if(nodes[j].ID == edges[i].end){
 					int flag = 0;
 					node *neighbor = &nodes[j];
-                    pthread_mutex_lock(&lo);
+                    //pthread_mutex_lock(&neighbor->mut);
 					double g1 = n->g + edges[i].distance;
 					if(neighbor->closed == 1){
 						if(g1 < neighbor->g){
@@ -175,7 +170,7 @@ void *job(void *Rank){
                         //neighbor->visited = 1;
 						neighbor->previous = n;
 					}
-                    pthread_mutex_unlock(&lo);
+                    //pthread_mutex_unlock(&neighbor->mut);
 					break;
 				}
 			}
@@ -286,7 +281,6 @@ int main(int argc, char *argv[]){
 	for (int i = 0 ; i < pthread_num ; i++){
         rank[i] = i;
 		pthread_create(&t[i], NULL, &job, &rank[i]);
-        sleep(1);
 	}
     root_tid = t[0];
 	for (int i = 0 ; i < pthread_num ; i++){

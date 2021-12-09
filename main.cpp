@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -46,11 +47,18 @@ static vector<node> nodes;
 static vector<edge> edges;
 static string start;
 static string endd;
-pthread_mutex_t lo,li;
+
+# define pthread_num  1
+# define PAD 64
+pthread_t t[pthread_num];
+bool mask[pthread_num][PAD] = {1};
+pthread_t root_tid = 0;
+pthread_mutex_t lo,li,lm;
+
 
 double incumbent_cost = DBL_MAX;
 bool compare(node *a, node *b){
-	return a->g + a->h > b->g + b->h;
+	return a->g + a->h < b->g + b->h; // 升冪
 }
 
 double find_dist(vector<edge> edges, node *a, node *b){
@@ -61,26 +69,51 @@ double find_dist(vector<edge> edges, node *a, node *b){
 	return DBL_MAX;
 }
 
-void *job(void *args){
+void *job(void *Rank){
+    int rank = *(int *)Rank;
 	while(1){
+        int cont_flag = 0;
+        //printf("mask & (1 << rank)%x\n",mask & (1 << rank));
+        if(mask[rank][0] == 0){
+            return NULL;
+        }
         //printf("%lu\n",OPEN.size());
-		if(OPEN.size() == 0)
-			continue;
+		if(OPEN.size() == 0){
+            int accu = 0;
+            for (int i = 0 ; i < pthread_num ; i++){
+                if(mask[i][0] == 0) accu++;
+            }
+            if(accu == 1) {
+                return NULL;
+            }
+            else continue;
+        }
         pthread_mutex_lock(&lo);
 		sort(OPEN.begin(), OPEN.end(), compare);
-		node *n = OPEN[OPEN.size() - 1];
-		if(n->g + n->h >= incumbent_cost)
-			break;
+		node *n = OPEN[0];
+        n->visited = 1;
+		if(n->g + n->h >= incumbent_cost){
+            cont_flag = 1;
+        }
+        if(n->ID == endd){
+			if(n->g < incumbent_cost){
+                pthread_mutex_lock(&li);
+				incumbent_cost = n->g;
+                pthread_mutex_unlock(&li);
+            }
+            pthread_mutex_lock(&lm);
+            mask[rank][0] = 0;
+            pthread_mutex_unlock(&lm);
+            //printf("mask:%o\n",mask);
+            cont_flag = 1;
+		}
+        //printf("hh\n");
+        for (int i = 0 ; i < OPEN.size() - 1 ; i++)
+            OPEN[i] = OPEN[i+1];
 		OPEN.pop_back();
 		CLOSED.push_back(n);
         pthread_mutex_unlock(&lo);
-		if(n->ID == endd){
-            pthread_mutex_lock(&lo);
-			if(n->g < incumbent_cost){
-				incumbent_cost = n->g;
-			}
-            pthread_mutex_unlock(&lo);
-		}
+	    if(cont_flag == 1) continue;	
 		int i = 0;
 		for( ; i < edges.size(); i++){
 			if(edges[i].start == n->ID){
@@ -92,36 +125,40 @@ void *job(void *args){
 				if(nodes[j].ID == edges[i].end){
 					int flag = 0;
 					node *neighbor = &nodes[j];
+                    pthread_mutex_lock(&lo);
 					double g1 = n->g + edges[i].distance;
 					vector<node *>::iterator it1 = find(CLOSED.begin(),CLOSED.end(),neighbor);
 					vector<node *>::iterator it2 = find(OPEN.begin(),OPEN.end(),neighbor);
 					if(it1 != CLOSED.end()){
 						if(g1 < neighbor->g){
-                            pthread_mutex_lock(&lo);
+                            //pthread_mutex_lock(&lo);
 							OPEN.push_back(neighbor);
 							CLOSED.erase(it1);
-                            pthread_mutex_unlock(&lo);
+                            //pthread_mutex_unlock(&lo);
 						}else{
 							flag = 1;
 						}
 					}else{	
 						if(it2 == OPEN.end()){
-                            pthread_mutex_lock(&lo);
+                            //pthread_mutex_lock(&lo);
 							OPEN.push_back(neighbor);
-                            pthread_mutex_unlock(&lo);
+                            //pthread_mutex_unlock(&lo);
 						}else if(g1 >= neighbor->g){
 							flag = 1;
 						}
 					}
 					if(flag == 0){
 						neighbor->g = g1;
+                        //neighbor->visited = 1;
 						neighbor->previous = n;
 					}
+                    pthread_mutex_unlock(&lo);
 					break;
 				}
 			}
 		}
 	}
+    return NULL;
 }
 using std::cout; using std::endl;
 using std::chrono::duration_cast;
@@ -215,12 +252,14 @@ int main(int argc, char *argv[]){
     pthread_mutex_init(&lo, NULL);
     pthread_mutex_init(&li, NULL);
 	// OPEN, CLOSED, nodes, edges, 
-	int pthread_num = 1;
-	pthread_t t[pthread_num];
+    int rank[pthread_num];
 	for (int i = 0 ; i < pthread_num ; i++){
-		pthread_create(&t[i], NULL, &job, NULL);
+        rank[i] = i;
+		pthread_create(&t[i], NULL, &job, &rank[i]);
 	}
+    root_tid = t[0];
 	for (int i = 0 ; i < pthread_num ; i++){
+        printf("join\n");
 		pthread_join(t[i], NULL);
 	}
     pthread_mutex_destroy(&lo);

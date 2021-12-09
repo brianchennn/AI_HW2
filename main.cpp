@@ -26,6 +26,8 @@ typedef struct node{
 	double h;
 	bool visited;
 	node *previous;
+    bool open;
+    bool closed;
     pthread_mutex_t mut;
 }node;
 typedef struct{
@@ -49,13 +51,14 @@ static vector<edge> edges;
 static string start;
 static string endd;
 
-# define pthread_num  3
+# define pthread_num 4
 # define PAD 64
 pthread_t t[pthread_num];
 bool mask[pthread_num][PAD] = {1};
 pthread_t root_tid = 0;
-pthread_mutex_t lo,li,lm;
-
+pthread_mutex_t lo,li;
+pthread_mutex_t l1;
+pthread_mutex_t l[8];
 
 double incumbent_cost = DBL_MAX;
 bool compare(node *a, node *b){
@@ -81,7 +84,15 @@ void *job(void *Rank){
             printf("rank %d finished\n",rank);
             return NULL;
         }
-		if(OPEN.size() == 0){
+        int is_empty = 1;
+        for (int i = 0 ; i < nodes.size() ; i++){
+            if(nodes[i].open == 1){
+                is_empty = 0;
+                break;
+            }
+        }
+		//if(OPEN.size() == 0){
+        if(is_empty){
             int accu = 0;
             for (int i = 0 ; i < pthread_num ; i++){
                 if(mask[i][0] == 0) accu++;
@@ -89,12 +100,20 @@ void *job(void *Rank){
             if(accu == 1) return NULL;
             else continue;
         }
+        node *n;
         pthread_mutex_lock(&lo);
-		sort(OPEN.begin(), OPEN.end(), compare);
-		node *n = OPEN[0];
-        for (int i = 0 ; i < OPEN.size() - 1 ; i++)
-            OPEN[i] = OPEN[i+1];
-		OPEN.pop_back();
+        double min = DBL_MAX;
+        for (int i = 0 ; i < nodes.size(); i++){
+            if(nodes[i].g + nodes[i].h < min && nodes[i].open == 1){
+                min = nodes[i].g + nodes[i].h;
+                n = &nodes[i];
+            }
+        }
+		//sort(OPEN.begin(), OPEN.end(), compare);
+		//node *n = OPEN[0];
+        //for (int i = 0 ; i < OPEN.size() - 1 ; i++)
+            //OPEN[i] = OPEN[i+1];
+		//OPEN.pop_back();
         //pthread_mutex_unlock(&lo);
         n->visited = 1;
 		if(n->g + n->h >= incumbent_cost){
@@ -112,7 +131,9 @@ void *job(void *Rank){
             cont_flag = 1;
 		}
         //pthread_mutex_lock(&lo);
-		CLOSED.push_back(n);
+		//CLOSED.push_back(n);
+        n->open = 0;
+        n->closed = 1;
         pthread_mutex_unlock(&lo);
 	    if(cont_flag == 1) continue;	
 		int i = 0;
@@ -124,25 +145,26 @@ void *job(void *Rank){
 		for(; i < edges.size() && edges[i].start == n->ID; i++){
 			for(int j = 0; j < nodes.size(); j++){
 				if(nodes[j].ID == edges[i].end){
-                    pthread_mutex_lock(&lo);
 					int flag = 0;
 					node *neighbor = &nodes[j];
+                    pthread_mutex_lock(&lo);
 					double g1 = n->g + edges[i].distance;
-					vector<node *>::iterator it1 = find(CLOSED.begin(),CLOSED.end(),neighbor);
-					vector<node *>::iterator it2 = find(OPEN.begin(),OPEN.end(),neighbor);
-					if(it1 != CLOSED.end()){
+					if(neighbor->closed == 1){
 						if(g1 < neighbor->g){
                             //pthread_mutex_lock(&lo);
-							OPEN.push_back(neighbor);
-							CLOSED.erase(it1);
+							//OPEN.push_back(neighbor);
+                            neighbor->open = 1;
+                            neighbor->closed = 0;
+							CLOSED.erase(find(CLOSED.begin(),CLOSED.end(),neighbor));
                             //pthread_mutex_unlock(&lo);
 						}else{
 							flag = 1;
 						}
 					}else{	
-						if(it2 == OPEN.end()){
+						if(neighbor->open == 0){
                             //pthread_mutex_lock(&lo);
-							OPEN.push_back(neighbor);
+                            neighbor->open = 1;
+							//OPEN.push_back(neighbor);
                             //pthread_mutex_unlock(&lo);
 						}else if(g1 >= neighbor->g){
 							flag = 1;
@@ -229,6 +251,8 @@ int main(int argc, char *argv[]){
 			n.h = heuristics[i].end3;
 		n.visited = 0;
 		n.previous = NULL;
+        n.open = 0;
+        n.closed = 0;
         pthread_mutex_init(&n.mut,NULL);
 		nodes.push_back(n);
 	}
@@ -249,8 +273,9 @@ int main(int argc, char *argv[]){
 			break;
 		}
 	}
-	OPEN.push_back(root);
-	node *n;
+	//OPEN.push_back(root);
+    root->open = 1;
+	//node *n;
     pthread_mutex_init(&lo, NULL);
     pthread_mutex_init(&li, NULL);
 	// OPEN, CLOSED, nodes, edges, 

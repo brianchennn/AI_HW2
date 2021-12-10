@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <mutex>
 #include <thread>
+# define PAD 64
 using namespace std;
 
 typedef struct node{
@@ -45,14 +46,11 @@ typedef struct{
 	double speed_limit;
 }edge;
 
-static vector<node *> OPEN;
-static vector<node *> CLOSED;
 static vector<node> nodes;
 static vector<edge> edges;
 static string start;
 static string endd;
 
-# define PAD 64
 bool mask[32][PAD] = {1};
 pthread_mutex_t lo,li;
 
@@ -75,13 +73,13 @@ void *job(void *args){
 	while(1){
         int cont_flag = 0;
         if(mask[rank][0] == 0){
-            return NULL;
+			return NULL; // 表示自己的thread 該結束了
         }
         node *n;
         pthread_mutex_lock(&lo);
         double min = DBL_MAX;
         int is_empty = 1;
-        for (int i = 0 ; i < nodes.size(); i++){ // 檢查 OPEN 是否 empty
+        for (int i = 0 ; i < nodes.size(); i++){ // 檢查 OPEN 是否 empty 順便求出最佳的 node
             if(nodes[i].open == 1){
                 if(nodes[i].g + nodes[i].h < min){
                     is_empty = 0;
@@ -106,15 +104,14 @@ void *job(void *args){
             cont_flag = 1;
         }
         if(n->ID == endd){
-			if(n->g < incumbent_cost){
+			if(n->g < incumbent_cost){ // 最佳路徑
                 pthread_mutex_lock(&li);
-				incumbent_cost = n->g;
+				incumbent_cost = n->g; // 更新 incumbent_cost
                 pthread_mutex_unlock(&li);
             }
             mask[rank][0] = 0;
             cont_flag = 1;
 		}
-		CLOSED.push_back(n);
         n->open = 0;
         n->closed = 1;
         n->visited = 1;
@@ -138,7 +135,6 @@ void *job(void *args){
 						if(g1 < neighbor->g){
                             neighbor->open = 1;
                             neighbor->closed = 0;
-							CLOSED.erase(find(CLOSED.begin(),CLOSED.end(),neighbor));
 						}else{
 							flag = 1;
 						}

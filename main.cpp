@@ -52,14 +52,9 @@ static vector<edge> edges;
 static string start;
 static string endd;
 
-const int pthread_num = 8;
 # define PAD 64
-pthread_t t[pthread_num];
-bool mask[pthread_num][PAD] = {1};
-pthread_t root_tid = 0;
+bool mask[32][PAD] = {1};
 pthread_mutex_t lo,li;
-pthread_mutex_t l1;
-pthread_mutex_t l[8];
 
 double incumbent_cost = DBL_MAX;
 bool compare(node *a, node *b){
@@ -74,8 +69,9 @@ double find_dist(vector<edge> edges, node *a, node *b){
 	return DBL_MAX;
 }
 
-void *job(void *Rank){
-    int rank = *(int *)Rank;
+void *job(void *args){
+    int rank = *(int *)args;
+	int pthread_num = *((int *)args + 1);
 	while(1){
         int cont_flag = 0;
         if(mask[rank][0] == 0){
@@ -175,9 +171,12 @@ using std::chrono::system_clock;
 int main(int argc, char *argv[]){
 
 	auto t1 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-	if(argc != 3)
-		perror("Usage : ./main [start] [end]");
-	printf("\nReading csv file and generate nodes table...\n");
+	if(argc != 4)
+		perror("Usage : ./main [start] [end] [num of thread]\n");
+	const int pthread_num = atoi(argv[3]);
+	pthread_t t[pthread_num];
+	printf("\n===== Run program with %d thread =====\n",pthread_num);
+	printf("\n[Reading csv file and generate nodes table] \n");
 	
 	start = argv[1];
 	endd = argv[2];
@@ -219,7 +218,6 @@ int main(int argc, char *argv[]){
 		heuristics.push_back(heu);
 	}
 	fclose(fp);
-	//vector<node> nodes;
 	for(int i = 0 ; i < heuristics.size(); i++){
 		node n;
 		n.ID = heuristics[i].start;
@@ -238,10 +236,10 @@ int main(int argc, char *argv[]){
 		nodes.push_back(n);
 	}
 	auto t2 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-	printf(" %.3lfs used\n\n", (double)(t2 - t1)/1000);
+	printf("\n %.3lf sec\n\n", (double)(t2 - t1)/1000);
 
 
-	printf("Starting A* algorithm...\n");
+	printf("[Starting A* algorithm]\n");
 	auto t3 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 
 	node *root;
@@ -254,15 +252,19 @@ int main(int argc, char *argv[]){
     root->open = 1;
     pthread_mutex_init(&lo, NULL);
     pthread_mutex_init(&li, NULL);
-    int rank[pthread_num];
+	struct Args{
+		int rank;
+		int pthread_num;
+	};
 	for (int i = 0 ; i < pthread_num ; i++){
         mask[i][0] = 1;
     }
 	for (int i = 0 ; i < pthread_num ; i++){
-        rank[i] = i;
-		pthread_create(&t[i], NULL, &job, &rank[i]);
+		struct Args args;
+        args.rank = i;
+		args.pthread_num = pthread_num;
+		pthread_create(&t[i], NULL, &job, &args);
 	}
-    root_tid = t[0];
 	for (int i = 0 ; i < pthread_num ; i++){
 		pthread_join(t[i], NULL);
 	}
@@ -272,9 +274,9 @@ int main(int argc, char *argv[]){
         pthread_mutex_destroy(&(nodes[i].mut));
     }
 		auto t4 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-	printf(" %.3lfs used.\n\n",(double)(t4 - t3)/1000);
+	printf("\n %.3lf sec \n\n",(double)(t4 - t3)/1000);
 	
-	printf("Calculate statistic data...\n");
+	printf("[Calculating statistics Data]\n");
 	auto t5 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	vector<string> path;
 	double dist = 0.f;
@@ -303,11 +305,11 @@ int main(int argc, char *argv[]){
 		}
 		fclose(fp);
 		auto t6 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-		printf(" %.3lf used.\n\n\n",(double)(t6 - t5)/1000);
-		printf("A* Success\n");
+		printf("\n %.3lf sec \n\n",(double)(t6 - t5)/1000);
+		printf("\n==== Statistics =====\n\n");
 		printf("Visited_nodes: %d\n",visited_nodes);
-		printf("Total distance: %lf\n",dist);
-        printf("Execution time: %.3lf\n", (double)(t6-t1)/1000);
+		printf("Total distance: %.3lf m\n",dist);
+        printf("Execution time: %.3lf sec\n", (double)(t6-t1)/1000);
 	}
 	
 }

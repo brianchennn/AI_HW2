@@ -70,6 +70,7 @@ void *job(void *args){
 	while(1){
         int cont_flag = 0;
         if(mask[rank][0] == 0){
+			printf("rank %d return\n",rank);
 			return NULL; // 表示自己的thread 該結束了
         }
         node *n;
@@ -96,18 +97,18 @@ void *job(void *args){
         }
 
 		pthread_mutex_lock(&n->mut);
-		if(n->g + n->h >= incumbent_cost){ // OPEN 裡面的都很爛 表示差不多可以降低thread數量了
-            mask[rank][0] = 0;
-            cont_flag = 1;
-        }
-        if(n->ID == endd){
+		if(n->ID == endd){
 			if(n->g < incumbent_cost){ // 最佳路徑
                 pthread_mutex_lock(&li);
 				incumbent_cost = n->g; // 更新 incumbent_cost
                 pthread_mutex_unlock(&li);
             }
             cont_flag = 1;
-		}
+		}else if(n->g + n->h >= incumbent_cost){ // OPEN 裡面的都很爛 表示差不多可以降低thread數量了
+            mask[rank][0] = 0;
+            cont_flag = 1;
+        }
+
         n->open = 0;
         n->closed = 1;
         n->visited = 1;

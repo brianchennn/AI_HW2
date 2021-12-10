@@ -55,9 +55,6 @@ bool mask[32][PAD] = {1};
 pthread_mutex_t lo,li;
 
 double incumbent_cost = DBL_MAX;
-bool compare(node *a, node *b){
-	return a->g + a->h < b->g + b->h; // 升冪
-}
 
 double find_dist(vector<edge> edges, node *a, node *b){
 	for(int i=0;i<edges.size();i++){
@@ -109,7 +106,6 @@ void *job(void *args){
 				incumbent_cost = n->g; // 更新 incumbent_cost
                 pthread_mutex_unlock(&li);
             }
-            mask[rank][0] = 0;
             cont_flag = 1;
 		}
         n->open = 0;

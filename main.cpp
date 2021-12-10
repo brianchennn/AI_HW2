@@ -81,7 +81,7 @@ void *job(void *args){
         pthread_mutex_lock(&lo);
         double min = DBL_MAX;
         int is_empty = 1;
-        for (int i = 0 ; i < nodes.size(); i++){
+        for (int i = 0 ; i < nodes.size(); i++){ // 檢查 OPEN 是否 empty
             if(nodes[i].open == 1){
                 if(nodes[i].g + nodes[i].h < min){
                     is_empty = 0;
@@ -96,12 +96,12 @@ void *job(void *args){
             for (int i = 0 ; i < pthread_num ; i++){
                 if(mask[i][0] == 0) accu++;
             }
-            if(accu == 1) return NULL;
-            else continue;
+            if(accu == 1) return NULL; // 如果只剩自己1個 thread => 結束A* algorithm
+            else continue; // 如果還有其他 thread => busy waiting
         }
 
 		pthread_mutex_lock(&n->mut);
-		if(n->g + n->h >= incumbent_cost){
+		if(n->g + n->h >= incumbent_cost){ // OPEN 裡面的都很爛 表示差不多可以降低thread數量了
             mask[rank][0] = 0;
             cont_flag = 1;
         }
@@ -200,11 +200,12 @@ int main(int argc, char *argv[]){
 		edges.push_back(e);
 	}
 	fclose(fp);
-	fp = fopen("heuristic.csv","r");
+
+	FILE *fp2 = fopen("heuristic.csv","r");
 	vector<heuristic> heuristics;
 	heuristic heu;
-	fgets(str,256,fp);
-	while(fgets(str,256,fp)){
+	fgets(str,256,fp2);
+	while(fgets(str,256,fp2)){
 		const char s[2] = ",";
 		char *token = strtok(str, s);
 		string tmp1(token);
@@ -217,7 +218,8 @@ int main(int argc, char *argv[]){
 		heu.end3 = atof(token);
 		heuristics.push_back(heu);
 	}
-	fclose(fp);
+	fclose(fp2);
+
 	for(int i = 0 ; i < heuristics.size(); i++){
 		node n;
 		n.ID = heuristics[i].start;
@@ -237,7 +239,6 @@ int main(int argc, char *argv[]){
 	}
 	auto t2 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	printf("\n %.3lf sec\n\n", (double)(t2 - t1)/1000);
-
 
 	printf("[Starting A* algorithm]\n");
 	auto t3 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
@@ -273,7 +274,7 @@ int main(int argc, char *argv[]){
     for(int i = 0 ; i < nodes.size(); i++){
         pthread_mutex_destroy(&(nodes[i].mut));
     }
-		auto t4 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+	auto t4 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	printf("\n %.3lf sec \n\n",(double)(t4 - t3)/1000);
 	
 	printf("[Calculating statistics Data]\n");
@@ -281,7 +282,7 @@ int main(int argc, char *argv[]){
 	vector<string> path;
 	double dist = 0.f;
 	if(incumbent_cost == DBL_MAX){
-		printf("fail\n");
+		printf("Fail to find a path.\n");
 	}else{
         node *cur;
         for(int i = 0 ; i < nodes.size(); i++){

@@ -74,7 +74,7 @@ void *job(void *args){
 			return NULL; // 表示自己的thread 該結束了
         }
         node *n;
-        pthread_mutex_lock(&lo);
+        //pthread_mutex_lock(&lo);
         double min = DBL_MAX;
         int is_empty = 1;
         for (int i = 0 ; i < nodes.size(); i++){ // 檢查 OPEN 是否 empty 順便求出最佳的 node
@@ -86,7 +86,7 @@ void *job(void *args){
                 }
             }
         }
-        pthread_mutex_unlock(&lo);
+        //pthread_mutex_unlock(&lo);
         if(is_empty){
             int accu = 0;
             for (int i = 0 ; i < pthread_num ; i++){
@@ -96,7 +96,7 @@ void *job(void *args){
             else continue; // 如果還有其他 thread => busy waiting
         }
 
-		pthread_mutex_lock(&n->mut);
+		//pthread_mutex_lock(&n->mut);
 		if(n->ID == endd){
 			if(n->g < incumbent_cost){ // 最佳路徑
                 pthread_mutex_lock(&li);
@@ -112,7 +112,7 @@ void *job(void *args){
         n->open = 0;
         n->closed = 1;
         n->visited = 1;
-        pthread_mutex_unlock(&n->mut);
+        //pthread_mutex_unlock(&n->mut);
 
 	    if(cont_flag == 1) continue;	
 		int i = 0;
@@ -126,7 +126,7 @@ void *job(void *args){
 				if(nodes[j].ID == edges[i].end){
 					int flag = 0;
 					node *neighbor = &nodes[j];
-                    pthread_mutex_lock(&neighbor->mut);
+                    //pthread_mutex_lock(&neighbor->mut);
 					double g1 = n->g + edges[i].distance;
 					if(neighbor->closed == 1){
 						if(g1 < neighbor->g){
@@ -146,7 +146,7 @@ void *job(void *args){
 						neighbor->g = g1;
 						neighbor->previous = n;
 					}
-                    pthread_mutex_unlock(&neighbor->mut);
+                    //pthread_mutex_unlock(&neighbor->mut);
 					break;
 				}
 			}
@@ -253,11 +253,12 @@ int main(int argc, char *argv[]){
 	for (int i = 0 ; i < pthread_num ; i++){
         mask[i][0] = 1;
     }
+	Args args[12];
 	for (int i = 0 ; i < pthread_num ; i++){
-		struct Args args;
-        args.rank = i;
-		args.pthread_num = pthread_num;
-		pthread_create(&t[i], NULL, &job, &args);
+		
+        args[i].rank = i;
+		args[i].pthread_num = pthread_num;
+		pthread_create(&t[i], NULL, &job, &args[i]);
 	}
 	for (int i = 0 ; i < pthread_num ; i++){
 		pthread_join(t[i], NULL);

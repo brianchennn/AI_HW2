@@ -1,4 +1,4 @@
 all:
-	g++ -std=c++11 main.cpp -o main -lpthread
+	g++ -std=c++11 decen.cpp -o main -lpthread
 clean:
 	rm ./main

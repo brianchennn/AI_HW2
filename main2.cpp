@@ -160,14 +160,14 @@ int main(int argc, char *argv[]){
 
 	auto t1 = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 	if(argc != 4)
-		perror("Usage : ./main [start] [end] [num of thread]\n");
+		perror("Usage : ./main [Start Node] [End Node] [Number of Thread]\n");
 	const int pthread_num = atoi(argv[3]);
 	pthread_t t[pthread_num];
 	printf("\n===== Run program with %d thread =====\n",pthread_num);
 	printf("\n[Reading csv file and generate nodes table] \n");
 	
-	start = argv[1];
-	endd = argv[2];
+	start = argv[1]; // 1718165260
+	endd = argv[2];// 8513026827
 	char str[128];
 	FILE *fp = fopen("edges.csv","r");
 	edge e;
